@@ -1,29 +1,34 @@
 import csv
+import nltk
+from nltk import word_tokenize
+from nltk.corpus import stopwords
+from nltk.classify import NaiveBayesClassifier
+from collections import defaultdict
+import random
 
+nltk.download('punkt')
+nltk.download('stopwords')
 
 DATADIR = "./dataset"
 
+#______________________________________DATA PROCESSING_____________________________________________
 def read_data(filename):
     movies = []
-
+    all_genres = set()
+    
     with open(filename, "r", newline="", encoding="utf-8") as infile:
-
         reader = csv.reader(infile)
-
-        #Checks for all movies from the filtered dataset
+        next(reader)
+        
         for row in reader:
-            movie = []
-            #Removes any movie without genre or overview
-            if not (row[1] == "" or row[0] == ""):
-                movie.append(row[1])
-                movie.append(row[0])
-                movies.append(movie)
+            genres = [g.strip().lower() for g in row[0].split(",")]
+            overview = row[1].lower()
             
-    return movies
+            if genres and overview:
+                movies.append({"genres": genres, "text": overview})
+                all_genres.update(genres)
+    
+    return movies, sorted(all_genres)
 
-
-all_movies = read_data(f"{DATADIR}/filtered_movie_dataset.csv")
-
-
-#print(all_movies)
-print(f"Appropriately tagged movies in this dataset: {len(all_movies)}")
+movies, unique_genres = read_data(f"{DATADIR}/filtered_movie_dataset.csv")
+print(f"Loaded {len(movies)} movies with {len(unique_genres)} unique genres")

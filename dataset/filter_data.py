@@ -12,3 +12,4 @@ with open(raw_data_file, "r", newline="", encoding="utf-8") as infile, \
     for row in reader:
         if len(row) >= 17:
             writer.writerow([row[13], row[16]])
+
