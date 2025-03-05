@@ -40,6 +40,9 @@ print(f"Total clean movies with genres: {len(overviews)}")
 print(overviews[0], genre_labels[0])
 
 #______________________________________FEATURE ENGINEERING__________________________________________
+# In this section, the data is being filtered and put into vectors. 
+# Preparing data for the training and testing.
+
 
 #Transforms data into termfrequency inverse document frequency representation
 vetorizar = TfidfVectorizer(
@@ -67,7 +70,8 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.30, random
 
 
 # #______________________________________Models____________________________________________________
-
+# In this section, a couple of classifiers and models have been added. 
+# Trying to compare them eachother to grasp the effectiveness of each solution.
 
 
 # using Multi-label kNN classifier with regression model
@@ -101,6 +105,8 @@ main_classifier = OneVsRestClassifier(
 
 
 # #______________________________________TRAINING____________________________________________________
+# In this section, the chosen solution is trained.
+
 
 main_classifier.fit(X_train, y_train) 
 
@@ -123,6 +129,9 @@ print("Predicted genres:", predicted_genres)
 # print(mlb.inverse_transform(np.array([y_test[0]])))
 
 # #______________________________________EVALUATION__________________________________________________
+# This section contains the self-built evaluation methods. 
+# The metrics are artbitrary set and we should decide the standard to use.
+
 
 def accuracy(classifier, genres_list, overviews):
 
@@ -225,11 +234,15 @@ print("______________EVALUATION_______________")
 
 
 # #______________________________________EVALUATION BUILT-IN__________________________________________________
+# This section contains the built-in evaluation tools.
+
 
 predicted = main_classifier.predict(X_test)
 
 print(classification_report(y_test, predicted))
 
+
+# Checks for the evaluation metrics.
 accuracy = accuracy_score(y_test, predicted)
 precision = precision_score(y_test, predicted, average='micro')
 recall = recall_score(y_test, predicted, average='micro')
