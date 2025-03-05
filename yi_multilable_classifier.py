@@ -11,6 +11,8 @@ from sklearn.multiclass import OneVsRestClassifier
 from sklearn.multioutput import ClassifierChain
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.multiclass import OneVsRestClassifier
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+
 
 import nltk
 from sklearn.naive_bayes import MultinomialNB
@@ -80,20 +82,23 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.30, random
 #Problem with naivebayes, somehow receives zero division error
 
 # OneVsRestClassifier
-# main_classifier = OneVsRestClassifier(
-#     LinearSVC(class_weight='balanced', max_iter=1000)
-# )
+main_classifier = OneVsRestClassifier(
+    LinearSVC(class_weight='balanced', max_iter=1000)
+)
 #This is quick! And almost as accurate as regression model
 
 #ClassifierChain
-main_classifier = ClassifierChain(
-    LogisticRegression(max_iter=1000, class_weight='balanced')
-)
+# main_classifier = ClassifierChain(
+#     LogisticRegression(max_iter=1000, class_weight='balanced')
+# )
+#SLOW
 
 # # OneVsRestClassifier with randomforest
 # main_classifier = OneVsRestClassifier(
 #     RandomForestClassifier(n_estimators=100, class_weight='balanced')
 # )
+#VERY SLOW, 10 minutes and still can't print accuracy.
+
 
 # #______________________________________TRAINING____________________________________________________
 
@@ -216,4 +221,21 @@ def our_evaluate(classifier, genres_list, overviews):
     
     
 print("______________EVALUATION_______________")
-our_evaluate(main_classifier, list(y_test)[20000:21000], X_test[20000:21000])
+#our_evaluate(main_classifier, list(y_test)[20000:21000], X_test[20000:21000])
+
+
+# #______________________________________EVALUATION BUILT-IN__________________________________________________
+
+predicted = main_classifier.predict(X_test)
+
+print(classification_report(y_test, predicted))
+
+accuracy = accuracy_score(y_test, predicted)
+precision = precision_score(y_test, predicted, average='micro')
+recall = recall_score(y_test, predicted, average='micro')
+f1 = f1_score(y_test, predicted, average='micro')
+
+print("Accuracy:", accuracy)
+print("Precision:", precision)
+print("Recall:", recall)
+print("F1 Score:", f1)
