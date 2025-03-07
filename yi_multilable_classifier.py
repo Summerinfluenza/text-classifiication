@@ -6,7 +6,16 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, hamming_loss
 from sklearn.preprocessing import MultiLabelBinarizer
+from sklearn.svm import LinearSVC
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.multioutput import ClassifierChain
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+
+
 import nltk
+from sklearn.naive_bayes import MultinomialNB
 from nltk.corpus import stopwords
 import numpy as np
 
@@ -31,13 +40,16 @@ print(f"Total clean movies with genres: {len(overviews)}")
 print(overviews[0], genre_labels[0])
 
 #______________________________________FEATURE ENGINEERING__________________________________________
+# In this section, the data is being filtered and put into vectors. 
+# Preparing data for the training and testing.
+
 
 #Transforms data into termfrequency inverse document frequency representation
 vetorizar = TfidfVectorizer(
     #tokenizer=nltk.word_tokenize,
     #Removes useless common words that proviide no value like: "the", "and", etc.
     stop_words=stopwords.words('english'),
-    #Keep only the 5000 most common words, for the same of simplicity and prestanda
+    #Keep only the 5000 most common words, for the sake of simplicity and prestanda
     max_features=5000,
     #Captures siingle or word pairs
     ngram_range=(1,2)
@@ -57,14 +69,46 @@ y = mlb.fit_transform(genre_labels)
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.30, random_state=42) 
 
 
-# #______________________________________TRAINING____________________________________________________
+# #______________________________________Models____________________________________________________
+# In this section, a couple of classifiers and models have been added. 
+# Trying to compare them eachother to grasp the effectiveness of each solution.
 
-# using Multi-label kNN classifier 
-mlknn_classifier = MultiOutputClassifier(
-    LogisticRegression(max_iter=1000, class_weight='balanced'),
-    n_jobs=-1
+
+# using Multi-label kNN classifier with regression model
+# main_classifier = MultiOutputClassifier(
+#     LogisticRegression(max_iter=1000, class_weight='balanced'),
+#     n_jobs=-1
+# )
+
+
+# using Multi-label kNN classifier with naivebayes model
+#main_classifier = MultiOutputClassifier(MultinomialNB(), n_jobs=-1)
+#Problem with naivebayes, somehow receives zero division error
+
+# OneVsRestClassifier
+main_classifier = OneVsRestClassifier(
+    LinearSVC(class_weight='balanced', max_iter=1000)
 )
-mlknn_classifier.fit(X_train, y_train) 
+#This is quick! And almost as accurate as regression model
+
+#ClassifierChain
+# main_classifier = ClassifierChain(
+#     LogisticRegression(max_iter=1000, class_weight='balanced')
+# )
+#SLOW
+
+# # OneVsRestClassifier with randomforest
+# main_classifier = OneVsRestClassifier(
+#     RandomForestClassifier(n_estimators=100, class_weight='balanced')
+# )
+#VERY SLOW, 10 minutes and still can't print accuracy.
+
+
+# #______________________________________TRAINING____________________________________________________
+# In this section, the chosen solution is trained.
+
+
+main_classifier.fit(X_train, y_train) 
 
 #Testing the classifier on some sentence, expected label here is: animation
 test_sentences = ["clip science please collection force water us archival footage animated illustration amusing narration explain archimedes principle thing float others sink."
@@ -73,7 +117,7 @@ test_sentences = ["clip science please collection force water us archival footag
 test_sentences_tfidf = vetorizar.transform(test_sentences)
 
 #This is a vector in binary form
-predicted_labels = mlknn_classifier.predict(test_sentences_tfidf)
+predicted_labels = main_classifier.predict(test_sentences_tfidf)
 
 #Inverses into tokens
 print("______________TRAINING________________")
@@ -85,6 +129,9 @@ print("Predicted genres:", predicted_genres)
 # print(mlb.inverse_transform(np.array([y_test[0]])))
 
 # #______________________________________EVALUATION__________________________________________________
+# This section contains the self-built evaluation methods. 
+# The metrics are artbitrary set and we should decide the standard to use.
+
 
 def accuracy(classifier, genres_list, overviews):
 
@@ -129,13 +176,13 @@ def precision(classifier, genre, genres_list, overviews):
         
         #Checks if the predicted_class matches the given class
 
-        # Mtching genres with predicted and true genres is true positive, rest is false posivive
-        if set(genre).intersection(set(predicted_genres)):
-            if set(genre).intersection(set(true_genres)):
+        # Matching genres with predicted and true genres is true positive, rest is false posivive
+        if set(genre).intersection(set(true_genres)):
+            if set(genre).intersection(set(predicted_genres)):
                 true_positives += 1
             else:
                 false_positives += 1
-                print(set(genre), set(true_genres))
+                #print(set(genre), set(true_genres))
             
 
     #To avoid zero division
@@ -144,23 +191,25 @@ def precision(classifier, genre, genres_list, overviews):
     else:
         return true_positives / (true_positives + false_positives)
 
-def recall(classifier, c, overviews):
-    """Compute the class-specific recall of a classifier on a list of gold-standard overviews."""
-    # TODO: Implement this method to solve Problem 2
+def recall(classifier, genre, genres_list, overviews):
     # Counts from 0
     true_positives = 0
     false_negatives = 0
 
     #Loops all documents
-    for correct_class, sample in overviews:
-        predicted_class = classifier.predict(sample)
+    for genres, overview in zip(genres_list, overviews):
+        predicted_genres = mlb.inverse_transform(classifier.predict(overview))[0]
+        true_genres = mlb.inverse_transform(np.array([genres]))[0]
         
         #Checks if the predicted_class matches the given class
-        if predicted_class == c and correct_class == c:
-            #Counts each correctly predicted document
-            true_positives += 1
-        elif predicted_class != c and correct_class == c:
-            false_negatives += 1
+
+        # Matching genres with predicted and true genres is true positive, rest is false negative
+        if set(genre).intersection(set(predicted_genres)):
+            if set(genre).intersection(set(true_genres)):
+                true_positives += 1
+            else:
+                false_negatives += 1
+                #print(set(genre), set(true_genres))
             
     #To avoid zero division
     if (true_positives + false_negatives) == 0:
@@ -169,15 +218,37 @@ def recall(classifier, c, overviews):
         return true_positives / (true_positives + false_negatives)
 
 def our_evaluate(classifier, genres_list, overviews):
-    #print("accuracy = {:.2%}".format(accuracy(classifier, genres_list, overviews)))
+    print("accuracy = {:.2%}".format(accuracy(classifier, genres_list, overviews)))
     for c in mlb.classes_:
         p = precision(classifier, [c], genres_list, overviews)
-        print("class {}: precision = {:.2%}".format(c, p))
-    #     r = recall(classifier, c, overviews)
-    #     # TODO: Change the next line to compute the F1-score
-    #     f = 2 * p * r/ (p + r)
-    #     print("class {}: precision = {:.2%}, recall = {:.2%}, f1 = {:.2%}".format(c, p, r, f))
+        
+        r = recall(classifier, [c], genres_list, overviews)
+        # print("class {}: precision = {:.2%}".format(c, r))
+        # TODO: Change the next line to compute the F1-score
+        f = 2 * p * r/ (p + r)
+        print("class {}: precision = {:.2%}, recall = {:.2%}, f1 = {:.2%}".format(c, p, r, f))
     
     
 print("______________EVALUATION_______________")
-our_evaluate(mlknn_classifier, list(y_test)[20000:21000], X_test[20000:21000])
+#our_evaluate(main_classifier, list(y_test)[20000:21000], X_test[20000:21000])
+
+
+# #______________________________________EVALUATION BUILT-IN__________________________________________________
+# This section contains the built-in evaluation tools.
+
+
+predicted = main_classifier.predict(X_test)
+
+print(classification_report(y_test, predicted))
+
+
+# Checks for the evaluation metrics.
+accuracy = accuracy_score(y_test, predicted)
+precision = precision_score(y_test, predicted, average='micro')
+recall = recall_score(y_test, predicted, average='micro')
+f1 = f1_score(y_test, predicted, average='micro')
+
+print("Accuracy:", accuracy)
+print("Precision:", precision)
+print("Recall:", recall)
+print("F1 Score:", f1)
