@@ -12,7 +12,7 @@ from sklearn.multioutput import ClassifierChain
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-
+from sklearn.naive_bayes import ComplementNB
 
 import nltk
 from sklearn.naive_bayes import MultinomialNB
@@ -38,6 +38,7 @@ overviews, genre_labels = read_data(f"{DATADIR}/pre_processed_dataset.csv")
 
 print(f"Total clean movies with genres: {len(overviews)}")
 print(overviews[0], genre_labels[0])
+
 
 #______________________________________FEATURE ENGINEERING__________________________________________
 # In this section, the data is being filtered and put into vectors. 
@@ -82,13 +83,13 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.30, random
 
 
 # using Multi-label kNN classifier with naivebayes model
-#main_classifier = MultiOutputClassifier(MultinomialNB(), n_jobs=-1)
+main_classifier = MultiOutputClassifier(ComplementNB(), n_jobs=-1)
 #Problem with naivebayes, somehow receives zero division error
 
 # OneVsRestClassifier
-main_classifier = OneVsRestClassifier(
-    LinearSVC(class_weight='balanced', max_iter=1000)
-)
+# main_classifier = OneVsRestClassifier(
+#     LinearSVC(class_weight='balanced', max_iter=1000)
+# )
 #This is quick! And almost as accurate as regression model
 
 #ClassifierChain
@@ -136,7 +137,7 @@ print("Predicted genres:", predicted_genres)
 def accuracy(classifier, genres_list, overviews):
 
     # Counts from 0
-    documents = 0
+    overview_count = 0
     true_positives = 0
 
     #Loops all documents
@@ -154,13 +155,13 @@ def accuracy(classifier, genres_list, overviews):
         if set(true_genres).intersection(set(predicted_genres)):
             #Counts each correctly predicted document
             true_positives += 1
-        documents += 1
+        overview_count += 1
 
     #To avoid zero division
-    if documents == 0:
+    if overview_count == 0:
         return 0
     else:
-        return true_positives / documents
+        return true_positives / overview_count
 
 def precision(classifier, genre, genres_list, overviews):
     # Counts from 0
@@ -209,7 +210,7 @@ def recall(classifier, genre, genres_list, overviews):
                 true_positives += 1
             else:
                 false_negatives += 1
-                #print(set(genre), set(true_genres))
+                print(set(genre), set(true_genres))
             
     #To avoid zero division
     if (true_positives + false_negatives) == 0:
@@ -237,18 +238,42 @@ print("______________EVALUATION_______________")
 # This section contains the built-in evaluation tools.
 
 
-predicted = main_classifier.predict(X_test)
+# predicted = main_classifier.predict(X_test)
 
-print(classification_report(y_test, predicted))
+# print(classification_report(y_test, predicted))
 
 
-# Checks for the evaluation metrics.
-accuracy = accuracy_score(y_test, predicted)
-precision = precision_score(y_test, predicted, average='micro')
-recall = recall_score(y_test, predicted, average='micro')
-f1 = f1_score(y_test, predicted, average='micro')
+# # Checks for the evaluation metrics.
+# accuracy = accuracy_score(y_test, predicted)
+# precision = precision_score(y_test, predicted, average='micro')
+# recall = recall_score(y_test, predicted, average='micro')
+# f1 = f1_score(y_test, predicted, average='micro')
 
-print("Accuracy:", accuracy)
-print("Precision:", precision)
-print("Recall:", recall)
-print("F1 Score:", f1)
+# print("Accuracy:", accuracy)
+# print("Precision:", precision)
+# print("Recall:", recall)
+# print("F1 Score:", f1)
+
+
+# #______________________________________BASELINE__________________________________________________
+# This section contains the baseline, which uses the most frequent class.
+
+def mfc_baseline(genres_list):
+    genre_counter = {}
+
+    #Creates a dictionary of genre and count
+    for genres in genres_list:
+        true_genres = mlb.inverse_transform(np.array([genres]))[0]
+        for genre in true_genres:
+            if genre in genre_counter:
+                genre_counter[genre] += 1
+            else:
+                genre_counter[genre] = 1
+
+    #Sorts and choses the most frequent genre
+    sorted_genre_counter = sorted(genre_counter.items(), key=lambda kv:(-kv[1], kv[0]))
+
+    #Returns the counter / total of overviews = baseline
+    return sorted_genre_counter[0][1] / len(genres_list)
+
+print("Baseline: {:.2%}".format(mfc_baseline(list(y_test))))
