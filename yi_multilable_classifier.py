@@ -6,14 +6,15 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.svm import LinearSVC
+
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.multioutput import ClassifierChain
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report, hamming_loss
-from sklearn.naive_bayes import ComplementNB
 
 import nltk
-from sklearn.naive_bayes import MultinomialNB
+from sklearn.naive_bayes import MultinomialNB, ComplementNB, GaussianNB, BernoulliNB
+
 from nltk.corpus import stopwords
 import numpy as np
 
@@ -49,19 +50,21 @@ vetorizar = TfidfVectorizer(
     #Removes useless common words that proviide no value like: "the", "and", etc.
     stop_words=stopwords.words('english'),
     #Keep only the 10000 most common words, for the sake of simplicity and prestanda
-    max_features=10000,
-    min_df=2,
-    max_df=0.85,
+    max_features=5000,
+    min_df=3,
+    max_df=0.90,
     use_idf=True,
     norm='l2',
     #Captures single or word pairs
-    ngram_range=(1,3)
+    ngram_range=(1,2)
 )
 
 #Fitting the tf-idf vectors with overviews by:
 #1. Building a vocabulary (determined by max_features=5000) from all movie overviews
 #2. Calculates IDF for each term
 X = vetorizar.fit_transform(overviews)
+
+
 
 mlb = MultiLabelBinarizer()
 # Coverts genre list into a binary(0, 1) matrix
@@ -72,65 +75,54 @@ y = mlb.fit_transform(genre_labels)
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.30, random_state=42) 
 
 
-# #______________________________________Models____________________________________________________
-# In this section, a couple of classifiers and models have been added. 
-# Trying to compare them eachother to grasp the effectiveness of each solution.
-print("______________MODELS________________")
+# #______________________________________ALGORITHMS____________________________________________________
+# In this section, using the same strategy with knn but with different algorithms.
+print("______________Algorithms________________")
+all_classifiers = []
 
-# using Multi-label kNN classifier with regression model
-main_classifier = MultiOutputClassifier(
-    LogisticRegression(max_iter=1000, class_weight='balanced'),
+#"______________Logistic regression________________")
+LR_knn_classifier = MultiOutputClassifier(
+    LogisticRegression(max_iter=2000, class_weight='balanced'),
     n_jobs=-1
 )
+all_classifiers.append(LR_knn_classifier)
 
+#"______________Naive Bayes________________")
+CNB_knn_classifier = MultiOutputClassifier(ComplementNB(), n_jobs=-1)
+all_classifiers.append(CNB_knn_classifier)
 
-# using Multi-label kNN classifier with naivebayes model
-#main_classifier = MultiOutputClassifier(ComplementNB(), n_jobs=-1)
-#Problem with naivebayes, somehow receives zero division error
+BNB_knn_classifier = MultiOutputClassifier(BernoulliNB(), n_jobs=-1)
+all_classifiers.append(BNB_knn_classifier)
 
-# OneVsRestClassifier
-# main_classifier = OneVsRestClassifier(
-#     LinearSVC(C=1.0, class_weight='balanced', max_iter=2000, dual=False)
-# )
-#This is quick!
-
-# # OneVsRestClassifier with randomforest
-# main_classifier = OneVsRestClassifier(
-#     RandomForestClassifier(
-#         n_estimators=100, 
-#         max_depth=None, 
-#         min_samples_split=2, 
-#         min_samples_leaf=1,
-#         class_weight='balanced'
-#     )
-# )
-#VERY SLOW, 10 minutes and still can't print accuracy.
+#"______________LinearSVC________________")
+LSVC_knn_classifier = MultiOutputClassifier(
+    LinearSVC(C=1.0, class_weight='balanced', max_iter=2000, dual=False)
+)
+all_classifiers.append(LSVC_knn_classifier)
 
 
 # #______________________________________TRAINING____________________________________________________
 # In this section, the chosen solution is trained.
-
-
-main_classifier.fit(X_train, y_train) 
-
-#Testing the classifier on some sentence, expected label here is: animation
-test_sentences = ["clip science please collection force water us archival footage animated illustration amusing narration explain archimedes principle thing float others sink."
-]
-
-test_sentences_tfidf = vetorizar.transform(test_sentences)
-
-#This is a vector in binary form
-predicted_labels = main_classifier.predict(test_sentences_tfidf)
-
-#Inverses into tokens
 print("______________TRAINING________________")
-predicted_genres = mlb.inverse_transform(predicted_labels)
-print("Predicted genres:", predicted_genres)
-#print(len(main_classifier.classes_))
-# print(predicted_labels)
-# print("type of predicted_labels: ", type(predicted_labels))
-# print("type of y_test: ", type(y_test[0]))
-# print(mlb.inverse_transform(np.array([y_test[0]])))
+
+for classifier in all_classifiers:
+    #Trains the classifier
+    classifier.fit(X_train, y_train) 
+
+    #Testing the classifier on some sentence, expected label here is: animation
+    # test_sentences = ["clip science please collection force water us archival footage animated illustration amusing narration explain archimedes principle thing float others sink."
+    # ]
+
+    # test_sentences_tfidf = vetorizar.transform(test_sentences)
+
+    # #This is a vector in binary form
+    # predicted_labels = classifier.predict(test_sentences_tfidf)
+
+    # #Inverses into tokens
+    
+    # predicted_genres = mlb.inverse_transform(predicted_labels)
+    # print("Predicted genres:", predicted_genres)
+
 
 # #______________________________________EVALUATION__________________________________________________
 # This section contains the self-built evaluation methods. 
@@ -267,30 +259,15 @@ def our_evaluate(classifier, genres_list, overviews):
     fmeasure = 2 * precision_ratio * recall_ratio/ (precision_ratio + recall_ratio)
     print("precision = {:.2%}, recall = {:.2%}, f1 = {:.2%}".format(precision_ratio, recall_ratio, fmeasure))
     
-    
-print("______________EVALUATION_______________")
-our_evaluate(main_classifier, list(y_test)[30000:31000], X_test[30000:31000])
-
 
 # #______________________________________EVALUATION BUILT-IN__________________________________________________
 # This section contains the built-in evaluation tools.
+print("______________EVALUATION_______________")
 
+for classifier in all_classifiers:
+    predicted = classifier.predict(X_test)
+    print(f"Evaluation for classifier: {classifier}")
+    print(classification_report(y_test, predicted))
 
-# predicted = main_classifier.predict(X_test)
-
-# print(classification_report(y_test, predicted))
-
-
-# # Checks for the evaluation metrics.
-# #accuracy = accuracy_score(y_test, predicted)
-# precision = precision_score(y_test, predicted, average='micro')
-# recall = recall_score(y_test, predicted, average='micro')
-# f1 = f1_score(y_test, predicted, average='micro')
-
-# #print("Accuracy:", accuracy)
-# print("Precision:", precision)
-# print("Recall:", recall)
-# print("F1 Score:", f1)
-
-
+#our_evaluate(main_classifier, list(y_test)[30000:31000], X_test[30000:31000])
 
