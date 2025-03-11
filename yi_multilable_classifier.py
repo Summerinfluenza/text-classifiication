@@ -9,7 +9,7 @@ from sklearn.svm import LinearSVC
 
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.multioutput import ClassifierChain
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report, hamming_loss
 
 import nltk
@@ -78,34 +78,48 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.30, random
 # #______________________________________ALGORITHMS____________________________________________________
 # In this section, using the same strategy with knn but with different algorithms.
 print("______________Algorithms________________")
-all_classifiers = []
+all_models = []
 
 #"______________Logistic regression________________")
-LR_knn_classifier = MultiOutputClassifier(
+LR_model = MultiOutputClassifier(
     LogisticRegression(max_iter=2000, class_weight='balanced'),
     n_jobs=-1
 )
-all_classifiers.append(LR_knn_classifier)
+#all_models.append(LR_model)
 
 #"______________Naive Bayes________________")
-CNB_knn_classifier = MultiOutputClassifier(ComplementNB(), n_jobs=-1)
-all_classifiers.append(CNB_knn_classifier)
+CNB_model = MultiOutputClassifier(ComplementNB(), n_jobs=-1)
+#all_models.append(CNB_model)
 
-BNB_knn_classifier = MultiOutputClassifier(BernoulliNB(), n_jobs=-1)
-all_classifiers.append(BNB_knn_classifier)
+BNB_model = MultiOutputClassifier(BernoulliNB(), n_jobs=-1)
+#all_models.append(BNB_model)
 
 #"______________LinearSVC________________")
-LSVC_knn_classifier = MultiOutputClassifier(
+LSVC_model = MultiOutputClassifier(
     LinearSVC(C=1.0, class_weight='balanced', max_iter=2000, dual=False)
 )
-all_classifiers.append(LSVC_knn_classifier)
+#all_models.append(LSVC_model)
 
+
+# MultiOutputClassifier with randomforest
+RF_model = OneVsRestClassifier(
+    ExtraTreesClassifier(
+        n_estimators=20,
+        max_depth=20,
+        min_samples_split=10,
+        class_weight='balanced_subsample',
+        n_jobs=-1,
+        random_state=42
+    ),
+    n_jobs=-1
+)
+all_models.append(RF_model)
 
 # #______________________________________TRAINING____________________________________________________
 # In this section, the chosen solution is trained.
 print("______________TRAINING________________")
 
-for classifier in all_classifiers:
+for classifier in all_models:
     #Trains the classifier
     classifier.fit(X_train, y_train) 
 
@@ -264,10 +278,10 @@ def our_evaluate(classifier, genres_list, overviews):
 # This section contains the built-in evaluation tools.
 print("______________EVALUATION_______________")
 
-for classifier in all_classifiers:
+for classifier in all_models:
     predicted = classifier.predict(X_test)
     print(f"Evaluation for classifier: {classifier}")
-    print(classification_report(y_test, predicted))
+    print(classification_report(y_test[20000:21000], predicted[20000:21000]))
 
 #our_evaluate(main_classifier, list(y_test)[30000:31000], X_test[30000:31000])
 
